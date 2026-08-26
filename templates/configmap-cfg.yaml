@@ -1,0 +1,13 @@
+{{- $envAll := . }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sona-cfg
+data:
+  component-cfg.json: |
+    {
+        "org.onosproject.net.flow.impl.FlowRuleManager": {
+            "allowExtraneousRules": {{ .Values.onos.config.allowExtraRules }}
+        }
+    }

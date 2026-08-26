@@ -1,0 +1,246 @@
+{{/*
+Copyright 2021-present SK Telecom
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+
+{{- $envAll := . }}
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: "sona-onos"
+  labels:
+{{ tuple $envAll "sona" "onos" | include "helm-toolkit.snippets.kubernetes_metadata_labels" | indent 4 }}
+spec:
+  serviceName: "sona-onos"
+  podManagementPolicy: "Parallel"
+  selector:
+    matchLabels:
+{{ tuple $envAll "sona" "onos" | include "helm-toolkit.snippets.kubernetes_metadata_labels" | indent 6 }}
+  replicas: {{ .Values.onos.replicaCount }}
+  template:
+    metadata:
+      labels:
+{{ tuple $envAll "sona" "onos" | include "helm-toolkit.snippets.kubernetes_metadata_labels" | indent 8 }}
+    spec:
+      serviceAccountName: kubevirt-cni
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      hostNetwork: {{ .Values.onos.hostNetwork}}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: application
+                operator: In
+                values:
+                - sona
+            topologyKey: "kubernetes.io/hostname"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+        - key: node.kubernetes.io/not-ready
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: onos-sona
+          image: {{ .Values.images.registry }}/{{ .Values.images.tags.onos }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          livenessProbe:
+            exec:
+              command:
+                - /tmp/sona-liveness-check.sh
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 15
+          readinessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - curl -v --silent http://localhost:{{ .Values.leader.port }}/ 2>&1 | grep $HOSTNAME
+            initialDelaySeconds: 3
+            periodSeconds: 6
+            timeoutSeconds: 2
+          ports:
+            - containerPort: {{ .Values.onos.port.openflow }}
+            - containerPort: {{ .Values.onos.port.ovsdb }}
+            - containerPort: {{ .Values.onos.port.onosWeb }}
+            - containerPort: {{ .Values.onos.port.onosSsh }}
+            - containerPort: {{ .Values.onos.port.onosCluster }}
+            - containerPort: {{ .Values.onos.port.prometheusExporter }}
+          volumeMounts:
+            - name: sona-bin
+              mountPath: /tmp/sona-liveness-check.sh
+              subPath: sona-liveness-check.sh
+              readOnly: true
+            - name: sona-log
+              mountPath: /root/onos/apache-karaf-4.2.14/data/log
+              readOnly: false
+            - name: sona-cfg
+              mountPath: /root/onos/config/component-cfg.json
+              subPath: component-cfg.json
+              readOnly: true
+          {{- if .Values.onos.resources }}
+          resources: {{- toYaml .Values.onos.resources | nindent 12 }}
+          {{- end }}
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Dfile.encoding=UTF8 -Donos.cluster.messaging.minTimeoutMillis=500 -Donos.cluster.messaging.connectionPoolSize=16 -Dlog4j.formatMsgNoLookups=true -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseContainerSupport -XX:+PrintFlagsFinal"
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+        - name: leader-elector
+          image: {{ .Values.images.registry }}/{{ .Values.images.tags.leader }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          args:
+          - --election=kubevirt-cni
+          - --http=0.0.0.0:{{ .Values.leader.port }}
+          - --election-namespace={{ .Release.Namespace }}
+          - --ttl=5s
+          ports:
+          - containerPort: {{ .Values.leader.port }}
+          resources:
+            limits: {}
+            requests:
+              memory: 128Mi
+              cpu: 250m
+        - name: sona-config
+          image: {{ .Values.images.registry }}/{{ .Values.images.tags.python }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.config.port }}
+          command: ["/bin/sh","-c"]
+          args:
+            - /tmp/sona-readiness-check.sh ;
+              /tmp/mastership-check.sh ;
+              /tmp/dns-resolution-check.sh ;
+              /tmp/k8s-api-check.sh ;
+              /tmp/convert-kube-config.py -i /tmp/kube_admin.conf -o /tmp/onos_config.json ;
+              curl --user onos:rocks -X POST -H "Content-Type:application/json" http://127.0.0.1:8181/onos/kubevirtnode/api-config -d @/tmp/onos_config.json ;
+              sleep 10 ;
+              curl --user onos:rocks -X GET http://127.0.0.1:8181/onos/kubevirtnode/node/init/all ;
+              sleep 30 ;
+              curl --user onos:rocks -X GET http://127.0.0.1:8181/onos/kubevirtnode/node/sync/rules ;
+              sleep 300 ;
+              while true; do sleep 60; curl --user onos:rocks -X GET http://127.0.0.1:8181/onos/kubevirtnode/node/init/incomplete; done;
+          livenessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - /tmp/sona-config-check.sh
+            initialDelaySeconds: 80
+            periodSeconds: 30
+            timeoutSeconds: 15
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - /tmp/sona-config-check.sh
+            initialDelaySeconds: 60
+            periodSeconds: 12
+            timeoutSeconds: 6
+            failureThreshold: 3
+          volumeMounts:
+            - name: sona-bin
+              mountPath: /tmp/convert-kube-config.py
+              subPath: convert-kube-config.py
+              readOnly: true
+            - name: sona-bin
+              mountPath: /tmp/sona-readiness-check.sh
+              subPath: sona-readiness-check.sh
+              readOnly: true
+            - name: sona-bin
+              mountPath: /tmp/sona-health-check.sh
+              subPath: sona-health-check.sh
+              readOnly: true
+            - name: sona-bin
+              mountPath: /tmp/mastership-check.sh
+              subPath: mastership-check.sh
+              readOnly: true
+            - name: sona-bin
+              mountPath: /tmp/sona-config-check.sh
+              subPath: sona-config-check.sh
+              readOnly: true
+            - name: sona-bin
+              mountPath: /tmp/dns-resolution-check.sh
+              subPath: dns-resolution-check.sh
+              readOnly: true
+            - name: sona-bin
+              mountPath: /tmp/k8s-api-check.sh
+              subPath: k8s-api-check.sh
+              readOnly: true
+            - name: kube-home
+              mountPath: /tmp/kube_admin.conf
+              subPath: admin.conf
+              readOnly: true
+            - name: network-config
+              mountPath: /tmp/network-config
+              readOnly: false
+          env:
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: KUBERNETES_API
+              value: {{ .Values.onos.apiServerFqdn }}
+            - name: MY_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          resources:
+            limits: {}
+            requests:
+              memory: 128Mi
+              cpu: 250m
+      volumes:
+        - name: sona-bin
+          configMap:
+            name: sona-bin
+            defaultMode: 0555
+        - name: sona-config
+          hostPath:
+            path: /tmp/sona-config
+            type: DirectoryOrCreate
+        - name: sona-log
+          hostPath:
+            path: /var/log/sona-log
+            type: DirectoryOrCreate
+        - name: network-config
+          hostPath:
+            path: /tmp/network-config
+            type: DirectoryOrCreate
+        - name: sona-cfg
+          configMap:
+            name: sona-cfg
+            defaultMode: 0555
+        - name: kube-home
+          hostPath:
+            path: /etc/kubernetes/
+      dnsPolicy: ClusterFirstWithHostNet
+      restartPolicy: Always
+      {{- if .Values.images.pullSecrets }}
+      imagePullSecrets:
+        - name: {{ .Values.images.pullSecrets }}
+      {{- end }}
