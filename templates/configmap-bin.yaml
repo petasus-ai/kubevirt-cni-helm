@@ -1,0 +1,23 @@
+{{- $envAll := . }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sona-bin
+data:
+  sona-readiness-check.sh: |
+{{ tuple "bin/_sona-readiness-check.sh.tpl" . | include "helm-toolkit.utils.template" | indent 4 }}
+  sona-liveness-check.sh: |
+{{ tuple "bin/_sona-liveness-check.sh.tpl" . | include "helm-toolkit.utils.template" | indent 4 }}
+  mastership-check.sh: |
+{{ tuple "bin/_mastership-check.sh.tpl" . | include "helm-toolkit.utils.template" | indent 4 }}
+  sona-health-check.sh: |
+{{ tuple "bin/_sona-health-check.sh.tpl" . | include "helm-toolkit.utils.template" | indent 4 }}
+  sona-config-check.sh: |
+{{ tuple "bin/_sona-config-check.sh.tpl" . | include "helm-toolkit.utils.template" | indent 4 }}
+  dns-resolution-check.sh: |
+{{ tuple "bin/_dns-resolution-check.sh.tpl" . | include "helm-toolkit.utils.template" | indent 4 }}
+  k8s-api-check.sh: |
+{{ tuple "bin/_k8s-api-check.sh.tpl" . | include "helm-toolkit.utils.template" | indent 4 }}
+  convert-kube-config.py: |
+{{ tuple "bin/_convert-kube-config.py.tpl" . | include "helm-toolkit.utils.template" | indent 4 }}
