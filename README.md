@@ -4,7 +4,7 @@ Kubevirt-CNI is a kubevirt tailored CNI aims to provide VM friendly networking m
 ## TL;DR;
 
 ```console
-$ git clone https://github.com/sonaproject/kubevirt-cni-helm.git
+$ git clone https://github.com/petasus-ai/kubevirt-cni-helm.git
 $ helm install kubevirt-cni kubevirt-cni-helm
 ```
 
@@ -46,9 +46,10 @@ The command removes all the Kubernetes components associated with the chart and 
 The following tables lists the configurable parameters of the SONA chart and their default values.
 | Parameter                            | Description                                                            | Default                                      |
 |--------------------------------------|------------------------------------------------------------------------|----------------------------------------------|
-| `images.tags.curl`                   | CURL container image path                                              | `opensona/os-client-docker`                  |
-| `images.tags.python`                 | Python container image path                                            | `opensona/python-docker`                     |
-| `images.tags.onos`                   | ONOS container image path                                              | `opensona/onos-sona-nightly-docker:kubevirt` |                                 |         
+| `images.registry`                    | Container image registry                                               | `quay.io`                                    |
+| `images.tags.python`                 | Python container image path                                            | `edgestack/python-docker:latest`             |
+| `images.tags.onos`                   | ONOS container image path                                              | `edgestack/onos-sona-nightly-docker:kubevirt` |
+| `images.tags.leader`                 | Leader elector container image path                                    | `edgestack/leader-elector:1.0`               |
 | `images.pullPolicy`                  | All container images pull policy                                       | `IfNotPresent`                               |
 | `onos.replicaCount`                  | ONOS POD replica number                                                | `1`                                          |
 | `onos.hostNetwork`                   | Default networking deployment model, this will use host IP as POD IP   | `true`                                       |
@@ -143,7 +144,7 @@ $ kubectl annotate nodes kubevirt-worker-2 physnet-config='[{ network: "physnet"
 
 3. Install kubevirt-cni helm chart.
 ```console
-$ git clone https://github.com/sonaproject/kubevirt-cni-helm.git
+$ git clone https://github.com/petasus-ai/kubevirt-cni-helm.git
 $ helm install kubevirt-cni kubevirt-cni-helm
 ```
 Wait until all kubevirt-cni PODs are up and running.

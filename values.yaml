@@ -18,12 +18,11 @@
 
 images:
   pullPolicy: IfNotPresent
-  registry: registry.gitlab.com
+  registry: quay.io
   tags:
-    curl: 'sonaproject/tool-docker:latest'
-    python: 'sonaproject/python-docker:latest'
-    onos: 'sonaproject/onos-sona-nightly-docker:kubevirt'
-    leader: 'sonaproject/leader-elector:1.0'
+    python: 'edgestack/python-docker:latest'
+    onos: 'edgestack/onos-sona-nightly-docker:kubevirt'
+    leader: 'edgestack/leader-elector:1.0'
   # pullSecrets: regcred
 
 config:

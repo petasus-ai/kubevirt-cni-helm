@@ -19,7 +19,7 @@ jobs:
       - name: Helm Repository Checkout
         uses: actions/checkout@v2
         with:
-          repository: edgestack/edgestack-helm
+          repository: petasus-ai/edgestack-helm
           token: ${{ secrets.MY_TOKEN }}
           fetch-depth: 0
           persist-credentials: true
