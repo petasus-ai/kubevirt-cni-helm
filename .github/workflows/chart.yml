@@ -32,10 +32,13 @@ jobs:
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
           path: chart
+          fetch-depth: 0
       - uses: petasus-ai/.github/actions/guard-release-tag@30599a61231e382146695a0bbcaff37555bdb533
         with:
           path: chart
@@ -48,3 +51,8 @@ jobs:
           app-version: ${{ github.ref_name }}
           replace: ${{ github.ref_name == 'v3.5.0' && 'true' || 'false' }}
           token: ${{ secrets.MY_TOKEN }}
+      - name: Publish the GitHub release
+        uses: petasus-ai/.github/actions/github-release@075f162d2915e6506467a03465a6c25bf971f8a1
+        with:
+          path: chart
+          token: ${{ github.token }}
