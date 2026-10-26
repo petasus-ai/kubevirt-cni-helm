@@ -20,10 +20,9 @@ images:
   pullPolicy: IfNotPresent
   registry: quay.io
   tags:
-    # Releases of petasus-ai/python-docker and petasus-ai/leader-elector; onos-sona has
-    # no release yet.
+    # Releases of petasus-ai/python-docker, petasus-ai/onos-sona and petasus-ai/leader-elector.
     python: 'edgestack/python-docker:v3.5.0'
-    onos: 'edgestack/onos-sona-nightly-docker:kubevirt'
+    onos: 'edgestack/onos-sona-nightly-docker:v3.5.0'
     leader: 'edgestack/leader-elector:v3.5.0'
   # pullSecrets: regcred
 
