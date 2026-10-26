@@ -52,7 +52,7 @@ jobs:
           replace: ${{ github.ref_name == 'v3.5.0' && 'true' || 'false' }}
           token: ${{ secrets.MY_TOKEN }}
       - name: Publish the GitHub release
-        uses: petasus-ai/.github/actions/github-release@075f162d2915e6506467a03465a6c25bf971f8a1
+        uses: petasus-ai/.github/actions/github-release@v1
         with:
           path: chart
           token: ${{ github.token }}
